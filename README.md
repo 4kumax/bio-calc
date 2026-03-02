@@ -1,22 +1,24 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Калькулятор инвестиционных показателей — контейнер-ферма
 
-## Getting Started
+Next.js приложение для расчёта инвестиционных показателей проекта вертикальной фермы в 40-футовом контейнере (базилик, зелень, плоды).
 
-First, run the development server:
+## Функционал
+
+- **Выручка** — по объёму продукции и цене за кг  
+- **OPEX** — энергия, ФОТ, расходники, упаковка, логистика, аренда, обслуживание  
+- **EBITDA/прибыль** и маржа  
+- **Окупаемость (payback)** и **годовой ROI**  
+- **NPV** с настраиваемой ставкой дисконтирования  
+- Таблица по месяцам на 12 месяцев  
+
+## Запуск локально
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Откройте [http://localhost:3000](http://localhost:3000) — автоматический редирект на калькулятор.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 

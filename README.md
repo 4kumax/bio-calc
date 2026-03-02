@@ -1,38 +1,54 @@
 # Калькулятор инвестиционных показателей — контейнер-ферма
 
-Next.js приложение для расчёта инвестиционных показателей проекта вертикальной фермы в 40-футовом контейнере (базилик, зелень, плоды).
+**v1.0.001** — Next.js приложение для расчёта инвестиционных показателей проекта вертикальной фермы в 40-футовом контейнере (базилик, зелень, плоды). Показатели приведены к законодательству РФ (актуально на март 2026).
 
 ## Функционал
 
-- **Выручка** — по объёму продукции и цене за кг  
-- **OPEX** — энергия, ФОТ, расходники, упаковка, логистика, аренда, обслуживание  
-- **EBITDA/прибыль** и маржа  
-- **Окупаемость (payback)** и **годовой ROI**  
-- **NPV** с настраиваемой ставкой дисконтирования  
-- Таблица по месяцам на 12 месяцев  
+### Инвестиционные показатели
+- **Выручка**, **OPEX** (энергия, ФОТ, расходники, упаковка, логистика, аренда, обслуживание)
+- **EBITDA**, маржа, **NPV**, **окупаемость**, **годовой ROI**
+- **Cash Flow** — помесячная таблица со всеми показателями (выручка, OPEX, амортизация, EBIT, проценты, налог, чистая прибыль, CF, кумулятив)
 
-## Запуск локально
+### Налоги (РФ 2026)
+- **УСН 6%** (доходы), **УСН 15%** (доходы − расходы, мин. 1%), **ОСНО** (налог на прибыль 20%)
+- **НДС** 22% (информативно)
+- **Амортизация** — линейный метод, настраиваемый СПИ
+
+### Финансирование
+- **Кредит** — доля заёмных, ставка, срок
+- **Лизинг** — ежемесячный платёж на контейнер
+
+### Производство и риски
+- **Сезонность** — шаблоны или свои коэффициенты по месяцам
+- **Рост** — годовой рост цены и урожайности
+- **Простои** и **потери урожая**
+- **Multi-container** — парк контейнеров
+
+### Tornado
+- Анализ чувствительности NPV к изменению ключевых параметров (±%)
+
+## Запуск
 
 ```bash
 npm install
 npm run dev
 ```
 
-Откройте [http://localhost:3000](http://localhost:3000) — автоматический редирект на калькулятор.
+Откройте [http://localhost:3000](http://localhost:3000) — редирект на калькулятор.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Python / uv (опционально)
 
-## Learn More
+```bash
+uv sync
+```
 
-To learn more about Next.js, take a look at the following resources:
+## Деплой на Vercel
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+1. Импортируйте репозиторий в [Vercel](https://vercel.com/new)
+2. Deploy — настройки Next.js по умолчанию подходят
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Технологии
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Next.js 16 (App Router)
+- React 19, TypeScript
+- Python 3.11, uv (pyproject.toml)

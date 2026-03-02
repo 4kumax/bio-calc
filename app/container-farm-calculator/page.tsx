@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
 type Money = number;
 
@@ -196,12 +196,18 @@ function calcNPV(capex: Money, cashflows: number[], discountRateAnnual: number):
 
 const MONTH_NAMES = ["янв", "фев", "мар", "апр", "май", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"];
 
+function getMonthYearLabel(monthNum: number): string {
+  const m = (monthNum - 1) % 12;
+  const y = 2026 + Math.floor((monthNum - 1) / 12);
+  return `${MONTH_NAMES[m]} ${y}`;
+}
+
 export default function Page() {
   const [energyPricingMode, setEnergyPricingMode] = useState<"perHourContainer" | "perKwh">("perHourContainer");
   const [containers, setContainers] = useState<number>(1);
 
   const [yieldKgPerMonth, setYieldKgPerMonth] = useState<number>(300);
-  const [pricePerKg, setPricePerKg] = useState<number>(1200);
+  const [pricePerKg, setPricePerKg] = useState<number>(2000);
 
   const [powerKw, setPowerKw] = useState<number>(14);
   const [hoursPerDay, setHoursPerDay] = useState<number>(18);
@@ -218,7 +224,7 @@ export default function Page() {
   const [rentAndOtherRubPerMonth, setRentAndOtherRubPerMonth] = useState<number>(20_000);
   const [maintenanceRubPerMonth, setMaintenanceRubPerMonth] = useState<number>(15_000);
 
-  const [containerCapexRub, setContainerCapexRub] = useState<number>(6_500_000);
+  const [containerCapexRub, setContainerCapexRub] = useState<number>(5_000_000);
   const [installationRub, setInstallationRub] = useState<number>(350_000);
   const [workingCapitalRub, setWorkingCapitalRub] = useState<number>(200_000);
 
@@ -414,7 +420,8 @@ export default function Page() {
   };
 
   return (
-    <main style={{ maxWidth: 1200, margin: "0 auto", padding: 24, fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, Arial" }}>
+    <main style={{ fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, Arial" }}>
+      <div style={{ maxWidth: 1200, margin: "0 auto", padding: 24 }}>
       <h1 style={{ fontSize: 26, margin: 0 }}>Калькулятор: контейнер-ферма (расширенный)</h1>
       <p style={{ marginTop: 8, color: "#444", fontSize: 14 }}>
         Показатели приведены к законодательству РФ (актуально на март 2026). Налоги, амортизация, кредит/лизинг, сезонность, рост, простои, потери, multi-container, tornado.
@@ -427,7 +434,7 @@ export default function Page() {
           <Collapse title="Производство и выручка">
             <Field label="Контейнеров" value={String(containers)} onChange={(v) => setContainers(parseNumber(v, 1))} hint="Парк" />
             <Field label="Выход (кг/мес на контейнер)" value={String(yieldKgPerMonth)} onChange={(v) => setYieldKgPerMonth(parseNumber(v, 300))} />
-            <Field label="Цена (руб/кг)" value={String(pricePerKg)} onChange={(v) => setPricePerKg(parseNumber(v, 1200))} />
+            <Field label="Цена (руб/кг)" value={String(pricePerKg)} onChange={(v) => setPricePerKg(parseNumber(v, 2000))} />
             <Field label="Простои (%)" value={String(downtimePct)} onChange={(v) => setDowntimePct(parseNumber(v, 0))} hint="Не работаем" />
             <Field label="Потери урожая (%)" value={String(lossPct)} onChange={(v) => setLossPct(parseNumber(v, 5))} />
           </Collapse>
@@ -499,7 +506,7 @@ export default function Page() {
           </Collapse>
 
           <Collapse title="CAPEX">
-            <Field label="Контейнер (руб)" value={String(containerCapexRub)} onChange={(v) => setContainerCapexRub(parseNumber(v, 6500000))} />
+            <Field label="Контейнер (руб)" value={String(containerCapexRub)} onChange={(v) => setContainerCapexRub(parseNumber(v, 5000000))} />
             <Field label="Монтаж (руб)" value={String(installationRub)} onChange={(v) => setInstallationRub(parseNumber(v, 350000))} />
             <Field label="Оборотный капитал (руб)" value={String(workingCapitalRub)} onChange={(v) => setWorkingCapitalRub(parseNumber(v, 200000))} />
           </Collapse>
@@ -599,9 +606,233 @@ export default function Page() {
           </div>
         </div>
       </section>
+
+      <section style={{ marginTop: 24, display: "flex", flexDirection: "column", gap: 24 }}>
+        <div style={{ border: "1px solid #e5e5e5", borderRadius: 12, padding: 20, background: "#fff" }}>
+          <h3 style={{ margin: "0 0 16px 0", fontSize: 16 }}>Прибыль (Cash Flow по месяцам)</h3>
+          <ProfitChart timeline={timeline} rub={rub} />
+        </div>
+        <div style={{ border: "1px solid #e5e5e5", borderRadius: 12, padding: 20, background: "#fff" }}>
+          <h3 style={{ margin: "0 0 16px 0", fontSize: 16 }}>Окупаемость (кумулятив − CAPEX)</h3>
+          <PaybackChart timeline={timeline} capexTotal={metrics.capexTotal} rub={rub} num={num} paybackMonths={metrics.paybackMonths} />
+        </div>
+      </section>
+      </div>
     </main>
   );
 }
+
+function ProfitChart(props: { timeline: MonthRow[]; rub: (n: number) => string }) {
+  const [mounted, setMounted] = useState(false);
+  const [tooltip, setTooltip] = useState<{ x: number; y: number; month: number; value: number } | null>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
+  useEffect(() => setMounted(true), []);
+
+  if (!mounted) return <div style={{ height: 200, display: "flex", alignItems: "center", justifyContent: "center", color: "#999" }}>Загрузка…</div>;
+
+  const { timeline } = props;
+  const data = timeline.slice(0, 60);
+  if (data.length === 0) return <div style={{ height: 200, color: "#999" }}>Нет данных</div>;
+
+  const vals = data.map((r) => r.cashflow);
+  const min = Math.min(...vals, 0);
+  const max = Math.max(...vals);
+  const range = Math.max(max - min, 1);
+  const w = 600;
+  const h = 200;
+  const pad = { top: 20, right: 20, bottom: 44, left: 60 };
+  const chartW = w - pad.left - pad.right;
+  const chartH = h - pad.top - pad.bottom;
+
+  const x = (i: number) => pad.left + (i / (data.length - 1 || 1)) * chartW;
+  const y = (v: number) => pad.top + chartH - ((v - min) / range) * chartH;
+
+  const pts = data.map((r, i) => `${x(i)},${y(r.cashflow)}`).join(" ");
+  const areaPts = `M${x(0)},${pad.top + chartH} L${data.map((r, i) => `${x(i)},${y(r.cashflow)}`).join(" L")} L${x(data.length - 1)},${pad.top + chartH} Z`;
+
+  const tickStep = data.length <= 24 ? 3 : data.length <= 60 ? 6 : 12;
+  const ticks = [];
+  for (let i = 0; i < data.length; i += tickStep) ticks.push(i);
+  if (data.length > 0 && (ticks.length === 0 || ticks[ticks.length - 1] !== data.length - 1)) {
+    ticks.push(data.length - 1);
+  }
+
+  const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const rect = svg.getBoundingClientRect();
+    const xVb = ((e.clientX - rect.left) / rect.width) * w;
+    const idx = Math.round(((xVb - pad.left) / chartW) * (data.length - 1));
+    const i = Math.max(0, Math.min(idx, data.length - 1));
+    setTooltip({ x: e.clientX, y: e.clientY, month: data[i].month, value: data[i].cashflow });
+  };
+
+  return (
+    <div style={{ width: "100%", position: "relative" }}>
+      <svg
+        ref={svgRef}
+        viewBox={`0 0 ${w} ${h}`}
+        preserveAspectRatio="xMidYMid meet"
+        style={{ width: "100%", height: "auto", maxHeight: 220 }}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={() => setTooltip(null)}
+      >
+        <defs>
+          <linearGradient id="profitGrad" x1="0" y1="1" x2="0" y2="0">
+            <stop offset="0" stopColor="#059669" stopOpacity="0.3" />
+            <stop offset="1" stopColor="#059669" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <path d={areaPts} fill="url(#profitGrad)" />
+        <polyline points={pts} fill="none" stroke="#059669" strokeWidth="2" strokeLinejoin="round" />
+        {min <= 0 && max >= 0 && (
+          <line x1={pad.left} x2={w - pad.right} y1={y(0)} y2={y(0)} stroke="#999" strokeWidth="1" strokeDasharray="4" />
+        )}
+        <text x={pad.left - 5} y={pad.top} fill="#666" fontSize="10" textAnchor="end">{props.rub(max)}</text>
+        <text x={pad.left - 5} y={pad.top + chartH} fill="#666" fontSize="10" textAnchor="end">{props.rub(min)}</text>
+        {ticks.map((i) => (
+          <g key={i}>
+            <line x1={x(i)} y1={pad.top + chartH} x2={x(i)} y2={pad.top + chartH + 4} stroke="#666" strokeWidth="1" />
+            <text x={x(i)} y={h - 8} fill="#666" fontSize="10" textAnchor="middle">{getMonthYearLabel(data[i].month)}</text>
+          </g>
+        ))}
+      </svg>
+      {tooltip && (
+        <div
+          style={{
+            position: "fixed",
+            left: tooltip.x + 12,
+            top: tooltip.y + 8,
+            padding: "8px 12px",
+            background: "rgba(0,0,0,0.85)",
+            color: "#fff",
+            fontSize: 12,
+            borderRadius: 6,
+            pointerEvents: "none",
+            zIndex: 1000,
+          }}
+        >
+          {getMonthYearLabel(tooltip.month)}: {props.rub(tooltip.value)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PaybackChart(props: {
+  timeline: MonthRow[];
+  capexTotal: number;
+  rub: (n: number) => string;
+  num: (n: number) => string;
+  paybackMonths: number | null;
+}) {
+  const [mounted, setMounted] = useState(false);
+  const [tooltip, setTooltip] = useState<{ x: number; y: number; month: number; value: number } | null>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
+  useEffect(() => setMounted(true), []);
+
+  if (!mounted) return <div style={{ height: 200, display: "flex", alignItems: "center", justifyContent: "center", color: "#999" }}>Загрузка…</div>;
+
+  const { timeline } = props;
+  const data = timeline.slice(0, 60);
+  if (data.length === 0) return <div style={{ height: 200, color: "#999" }}>Нет данных</div>;
+
+  const vals = data.map((r) => r.cumulativeAfterCapex);
+  const allVals = [...vals, 0];
+  const min = Math.min(...allVals);
+  const max = Math.max(...allVals);
+  const range = Math.max(max - min, 1);
+  const w = 600;
+  const h = 200;
+  const pad = { top: 20, right: 20, bottom: 44, left: 60 };
+  const chartW = w - pad.left - pad.right;
+  const chartH = h - pad.top - pad.bottom;
+
+  const x = (i: number) => pad.left + (i / (data.length - 1 || 1)) * chartW;
+  const y = (v: number) => pad.top + chartH - ((v - min) / range) * chartH;
+
+  const pts = data.map((r, i) => `${x(i)},${y(r.cumulativeAfterCapex)}`).join(" ");
+  const zeroY = y(0);
+
+  const tickStep = data.length <= 24 ? 3 : data.length <= 60 ? 6 : 12;
+  const ticks = [];
+  for (let i = 0; i < data.length; i += tickStep) ticks.push(i);
+  if (data.length > 0 && (ticks.length === 0 || ticks[ticks.length - 1] !== data.length - 1)) {
+    ticks.push(data.length - 1);
+  }
+
+  const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const rect = svg.getBoundingClientRect();
+    const xVb = ((e.clientX - rect.left) / rect.width) * w;
+    const idx = Math.round(((xVb - pad.left) / chartW) * (data.length - 1));
+    const i = Math.max(0, Math.min(idx, data.length - 1));
+    setTooltip({ x: e.clientX, y: e.clientY, month: data[i].month, value: data[i].cumulativeAfterCapex });
+  };
+
+  return (
+    <div style={{ width: "100%", position: "relative" }}>
+      <svg
+        ref={svgRef}
+        viewBox={`0 0 ${w} ${h}`}
+        preserveAspectRatio="xMidYMid meet"
+        style={{ width: "100%", height: "auto", maxHeight: 220 }}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={() => setTooltip(null)}
+      >
+        <defs>
+          <linearGradient id="paybackGrad" x1="0" y1="1" x2="0" y2="0">
+            <stop offset="0" stopColor="#2563eb" stopOpacity="0.2" />
+            <stop offset="1" stopColor="#2563eb" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <line x1={pad.left} x2={w - pad.right} y1={zeroY} y2={zeroY} stroke="#333" strokeWidth="1" strokeDasharray="4" />
+        <polyline points={pts} fill="none" stroke="#2563eb" strokeWidth="2" strokeLinejoin="round" />
+        <path
+          d={`M${x(0)},${pad.top + chartH} L${data.map((r, i) => `${x(i)},${y(r.cumulativeAfterCapex)}`).join(" L")} L${x(data.length - 1)},${pad.top + chartH} Z`}
+          fill="url(#paybackGrad)"
+        />
+        <text x={pad.left - 5} y={pad.top} fill="#666" fontSize="10" textAnchor="end">{props.rub(max)}</text>
+        <text x={pad.left - 5} y={pad.top + chartH} fill="#666" fontSize="10" textAnchor="end">{props.rub(min)}</text>
+        {ticks.map((i) => (
+          <g key={i}>
+            <line x1={x(i)} y1={pad.top + chartH} x2={x(i)} y2={pad.top + chartH + 4} stroke="#666" strokeWidth="1" />
+            <text x={x(i)} y={h - 8} fill="#666" fontSize="10" textAnchor="middle">{getMonthYearLabel(data[i].month)}</text>
+          </g>
+        ))}
+        {props.paybackMonths != null && props.paybackMonths > 0 && props.paybackMonths <= data.length && (
+          <circle cx={x(props.paybackMonths - 1)} cy={y(0)} r="5" fill="#dc2626" />
+        )}
+      </svg>
+      {tooltip && (
+        <div
+          style={{
+            position: "fixed",
+            left: tooltip.x + 12,
+            top: tooltip.y + 8,
+            padding: "8px 12px",
+            background: "rgba(0,0,0,0.85)",
+            color: "#fff",
+            fontSize: 12,
+            borderRadius: 6,
+            pointerEvents: "none",
+            zIndex: 1000,
+          }}
+        >
+          {getMonthYearLabel(tooltip.month)}: {props.rub(tooltip.value)}
+        </div>
+      )}
+      {props.paybackMonths != null && (
+        <div style={{ marginTop: 8, fontSize: 12, color: "#2563eb" }}>Окупаемость: {props.num(props.paybackMonths)} мес</div>
+      )}
+      {props.paybackMonths === null && (
+        <div style={{ marginTop: 8, fontSize: 12, color: "#999" }}>В пределах горизонта расчёта не окупается</div>
+      )}
+    </div>
+  );
+}
+
 
 function Collapse({ title, children }: { title: string; children: React.ReactNode }) {
   const [open, setOpen] = useState(false);

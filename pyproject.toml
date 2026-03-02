@@ -1,6 +1,6 @@
 [project]
 name = "bio-calc"
-version = "1.0.001"
+version = "1.0.002"
 description = "Калькулятор инвестиционных показателей — контейнер-ферма"
 requires-python = ">=3.11"
 

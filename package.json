@@ -1,6 +1,6 @@
 {
   "name": "bio_calc",
-  "version": "1.0.001",
+  "version": "1.0.002",
   "private": true,
   "scripts": {
     "dev": "next dev",

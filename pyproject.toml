@@ -1,0 +1,6 @@
+[project]
+name = "bio-calc"
+version = "1.0.001"
+description = "Калькулятор инвестиционных показателей — контейнер-ферма"
+requires-python = ">=3.11"
+
